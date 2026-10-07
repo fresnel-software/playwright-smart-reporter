@@ -8592,7 +8592,9 @@ function generateScripts(
       // Filter test list items by file
       document.querySelectorAll('.test-list-item').forEach(item => {
         const itemFile = item.dataset.file;
-        item.style.display = (itemFile === file) ? 'flex' : 'none';
+        const matches = itemFile === file;
+        item.classList.toggle('filter-hidden', !matches);
+        item.style.display = matches ? 'flex' : 'none';
       });
 
       // Update active file in tree
@@ -8671,6 +8673,7 @@ function generateScripts(
         const title = item.querySelector('.test-item-title')?.textContent?.toLowerCase() || '';
         const file = item.querySelector('.test-item-file')?.textContent?.toLowerCase() || '';
         const matches = title.includes(lowerQuery) || file.includes(lowerQuery);
+        item.classList.toggle('filter-hidden', !matches);
         item.style.display = matches ? 'flex' : 'none';
       });
 
@@ -8783,6 +8786,7 @@ function generateScripts(
 
         // If no filters active, show all
         if (!hasAnyFilter) {
+          item.classList.remove('filter-hidden');
           item.style.display = 'flex';
           return;
         }
@@ -8834,6 +8838,7 @@ function generateScripts(
 
         // AND between groups
         const show = matchesAttention && matchesStatus && matchesHealth && matchesGrade && matchesSuite && matchesTag;
+        item.classList.toggle('filter-hidden', !show);
         item.style.display = show ? 'flex' : 'none';
       });
 
@@ -9694,21 +9699,20 @@ ${includeComparison ? `    // Comparison functions\n${generateComparisonScript()
       loadMoreBtn.onclick = function() {
         const newCount = Math.min(visibleCount + PAGE_SIZE, allItems.length);
         for (let i = visibleCount; i < newCount; i++) {
-          allItems[i].style.display = '';
+          allItems[i].style.display = allItems[i].classList.contains('filter-hidden') ? 'none' : '';
         }
         visibleCount = newCount;
-        countDiv.textContent = 'Showing ' + visibleCount + ' of ' + allItems.length + ' tests';
         if (visibleCount >= allItems.length) {
           loadMoreBtn.style.display = 'none';
-          countDiv.textContent = 'Showing all ' + allItems.length + ' tests';
         }
       };
       listContainer.parentNode.appendChild(loadMoreBtn);
 
       // Listen for filter changes to reset pagination
       const observer = new MutationObserver(() => {
-        const visibleItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
-        countDiv.textContent = 'Showing ' + visibleItems.length + ' of ' + allItems.length + ' tests';
+        const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
+        const visibleItems = filteredItems.filter(item => item.style.display !== 'none');
+        countDiv.textContent = 'Showing ' + visibleItems.length + ' of ' + filteredItems.length + ' tests';
       });
       observer.observe(listContainer, { childList: false, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
     })();

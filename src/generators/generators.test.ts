@@ -94,6 +94,21 @@ describe('html-generator', () => {
       expect(html).toContain('skipped');
     });
 
+    it('updates the paginated test count to reflect the active filter', () => {
+      const data: HtmlGeneratorData = {
+        results: Array.from({ length: 51 }, (_, index) => createMinimalTestResult({ testId: `test-${index}` })),
+        history: createTestHistory(),
+        startTime: Date.now(),
+        options: {},
+      };
+
+      const { html } = generateHtml(data);
+
+      expect(html).toContain("item.classList.toggle('filter-hidden', !show)");
+      expect(html).toContain("const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'))");
+      expect(html).toContain("'Showing ' + visibleItems.length + ' of ' + filteredItems.length + ' tests'");
+    });
+
     it('renders every failure cluster and every test in each cluster', () => {
       const clusterSizes = [1, 4, 2, 6, 3, 8];
       const failureClusters: FailureCluster[] = clusterSizes.map((clusterSize, clusterIndex) => {
