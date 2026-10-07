@@ -48,4 +48,8 @@ benchmark/specs/
 coverage/
 
 # Local smart report development - temporary files and directories
-ref-data/
+ref-data/154
+ref-data/traces
+ref-data/*.json
+ref-data/smart-report.html
+ref-data/merge.config.ts
