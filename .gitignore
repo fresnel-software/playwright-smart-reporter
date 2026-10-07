@@ -47,6 +47,14 @@ benchmark/specs/
 # Coverage output
 coverage/
 
+# Generated local report data
+/smart-report.html
+/test-history.json
+
+# Local OpenCode settings
+.opencode/opencode.json
+.opencode
+
 # Local smart report development - temporary files and directories
 ref-data/154
 ref-data/traces
