@@ -1,5 +1,6 @@
 import type { TestResultData, FailureCluster } from '../types';
 import { hashString } from '../utils/sanitizers';
+import { isUnexpectedFailure } from '../utils/test-status';
 
 /**
  * Clusters similar test failures together for better analysis and reporting
@@ -10,11 +11,8 @@ export class FailureClusterer {
    * Excludes expected failures (tests marked with test.fail() that actually fail)
    */
   clusterFailures(results: TestResultData[]): FailureCluster[] {
-    // Only cluster truly unexpected failures - exclude expected failures (Issue #16)
-    const failedTests = results.filter(r =>
-      (r.status === 'failed' || r.status === 'timedOut') &&
-      r.outcome !== 'expected'  // Exclude expected failures
-    );
+    // Keep cluster membership identical to the smart report's failed total.
+    const failedTests = results.filter(isUnexpectedFailure);
 
     if (failedTests.length === 0) return [];
 

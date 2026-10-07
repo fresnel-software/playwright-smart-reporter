@@ -6,7 +6,7 @@
  */
 
 import type { TestResultData, TestHistory, RunComparison, RunSnapshotFile, SmartReporterOptions, FailureCluster, CIInfo, ThemeConfig, BrandingConfig, QualityGateResult, QualityGateRuleResult, QuarantineEntry } from '../types';
-import { formatDuration, escapeHtml, escapeJsString, sanitizeId, renderMarkdownLite, isFlakyTest, isFlakyScore, isConsistentlyFailingScore } from '../utils';
+import { formatDuration, escapeHtml, escapeJsString, sanitizeId, renderMarkdownLite, isFlakyTest, isFlakyScore, isConsistentlyFailingScore, isUnexpectedFailure } from '../utils';
 import { generateTrendChart } from './chart-generator';
 import { generateGroupedTests, generateTestCard, AttentionSets } from './card-generator';
 import { generateGallery, generateGalleryScript } from './gallery-generator';
@@ -276,7 +276,7 @@ function generateOverviewContent(
         <span class="section-title">Failure Clusters</span>
       </div>
       <div class="failure-clusters-grid">
-        ${failureClusters.slice(0, 5).map(cluster => {
+        ${[...failureClusters].sort((a, b) => b.count - a.count).map(cluster => {
           const firstError = cluster.tests[0]?.error || '';
           const errorPreview = firstError.split('\n')[0].slice(0, 100) + (firstError.length > 100 ? '...' : '');
           const affectedFiles = [...new Set(cluster.tests.map(t => t.file))];
@@ -289,12 +289,10 @@ function generateOverviewContent(
             </div>
             ${errorPreview ? `<div class="cluster-error">${escapeHtml(errorPreview)}</div>` : ''}
             <div class="cluster-tests">
-              ${cluster.tests.slice(0, 3).map(t => `<span class="cluster-test-name">${escapeHtml(t.title)}</span>`).join('')}
-              ${cluster.tests.length > 3 ? `<span class="cluster-more">+${cluster.tests.length - 3} more</span>` : ''}
+              ${cluster.tests.map(t => `<span class="cluster-test-name">${escapeHtml(t.title)}</span>`).join('')}
             </div>
             <div class="cluster-files">
-              ${affectedFiles.slice(0, 2).map(f => `<span class="cluster-file">${escapeHtml(f)}</span>`).join('')}
-              ${affectedFiles.length > 2 ? `<span class="cluster-more">+${affectedFiles.length - 2} files</span>` : ''}
+              ${affectedFiles.map(f => `<span class="cluster-file">${escapeHtml(f)}</span>`).join('')}
             </div>
           </div>
         `}).join('')}
@@ -572,10 +570,7 @@ export function generateHtml(data: HtmlGeneratorData): GeneratedReport {
     r.outcome === 'expected' ||  // Expected failures behaved as expected
     r.outcome === 'flaky'        // Flaky tests passed on retry
   ).length;
-  const failed = results.filter((r) =>
-    r.outcome === 'unexpected' &&
-    (r.status === 'failed' || r.status === 'timedOut')
-  ).length;
+  const failed = results.filter(isUnexpectedFailure).length;
   const skipped = results.filter((r) => r.status === 'skipped').length;
   // Flaky: tests that are flaky by either outcome (retry-based) OR history (mixed pass/fail)
   const flaky = results.filter((r) => isFlakyTest(r)).length;

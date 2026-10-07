@@ -46,3 +46,6 @@ benchmark/specs/
 
 # Coverage output
 coverage/
+
+# Local smart report development - temporary files and directories
+ref-data/

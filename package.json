@@ -85,12 +85,12 @@
     "@playwright/test": "^1.49.0",
     "@types/adm-zip": "^0.5.7",
     "@types/pdfkit": "^0.13.8",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^5.0.2",
     "typescript": "^5.3.0",
-    "vitest": "^2.1.0"
+    "vitest": "^5.0.2"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.1",
     "pdfkit": "^0.16.0"
   }
 }

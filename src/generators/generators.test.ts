@@ -9,7 +9,7 @@ import { generateTestCard, generateTestDetails, generateGroupedTests, type Atten
 import { generateTrendChart, type ChartData } from './chart-generator';
 import { generateGallery, generateGalleryScript } from './gallery-generator';
 import { generateComparison, generateComparisonScript, buildComparison } from './comparison-generator';
-import type { TestResultData, TestHistory, RunComparison, RunSummary } from '../types';
+import type { TestResultData, TestHistory, RunComparison, RunSummary, FailureCluster } from '../types';
 
 // Test fixtures
 const createMinimalTestResult = (overrides: Partial<TestResultData> = {}): TestResultData => ({
@@ -92,6 +92,47 @@ describe('html-generator', () => {
       expect(html).toContain('passed');
       expect(html).toContain('failed');
       expect(html).toContain('skipped');
+    });
+
+    it('renders every failure cluster and every test in each cluster', () => {
+      const clusterSizes = [1, 4, 2, 6, 3, 8];
+      const failureClusters: FailureCluster[] = clusterSizes.map((clusterSize, clusterIndex) => {
+        const clusterTests = Array.from({ length: clusterSize }, (_, testIndex) => createMinimalTestResult({
+          testId: `cluster-${clusterIndex + 1}-test-${testIndex + 1}`,
+          title: `Cluster ${clusterIndex + 1} Test ${testIndex + 1}`,
+          file: `tests/cluster-${clusterIndex + 1}.spec.ts`,
+          status: 'failed',
+          outcome: 'unexpected',
+          error: `Error: failure in cluster ${clusterIndex + 1}`,
+        }));
+        return {
+          id: `cluster-${clusterIndex + 1}`,
+          errorType: `Failure Type ${clusterIndex + 1}`,
+          count: clusterTests.length,
+          tests: clusterTests,
+        };
+      });
+
+      const { html } = generateHtml({
+        results: failureClusters.flatMap(cluster => cluster.tests),
+        history: createTestHistory(),
+        startTime: Date.now(),
+        options: {},
+        failureClusters,
+      });
+
+      expect(html.match(/<div class="cluster-card"/g)).toHaveLength(6);
+      expect(html.match(/<span class="cluster-test-name">/g)).toHaveLength(24);
+      const clusterTotal = [...html.matchAll(/<div class="cluster-count">(\d+) tests?<\/div>/g)]
+        .reduce((sum, match) => sum + Number(match[1]), 0);
+      expect(clusterTotal).toBe(24);
+      expect([...html.matchAll(/<div class="cluster-count">(\d+) tests?<\/div>/g)]
+        .map(match => Number(match[1]))).toEqual([8, 6, 4, 3, 2, 1]);
+      expect([...html.matchAll(/<div class="cluster-type">Failure Type (\d+)<\/div>/g)]
+        .map(match => Number(match[1]))).toEqual([6, 4, 2, 5, 3, 1]);
+      expect(html).toContain('aria-label="24 failed tests - click to filter"');
+      expect(html).toContain('Failure Type 6');
+      expect(html).toContain('Cluster 6 Test 8');
     });
 
     it('handles test with history entries', () => {
