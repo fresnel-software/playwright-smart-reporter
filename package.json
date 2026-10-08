@@ -27,6 +27,7 @@
     "!dist/**/*.test.js.map"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
