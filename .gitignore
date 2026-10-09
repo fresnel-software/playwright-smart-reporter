@@ -51,10 +51,6 @@ coverage/
 /smart-report.html
 /test-history.json
 
-# Local OpenCode settings
-.opencode/opencode.json
-.opencode
-
 # Local smart report development - temporary files and directories
 ref-data/154
 ref-data/traces
@@ -62,3 +58,4 @@ ref-data/*.json
 ref-data/smart-report.html
 ref-data/merge.config.ts
 .opencode/
+./opencode/*
