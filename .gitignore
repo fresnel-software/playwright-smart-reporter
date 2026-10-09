@@ -61,3 +61,4 @@ ref-data/traces
 ref-data/*.json
 ref-data/smart-report.html
 ref-data/merge.config.ts
+.opencode/
