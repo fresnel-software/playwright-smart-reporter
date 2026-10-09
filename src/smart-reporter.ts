@@ -63,7 +63,7 @@ import { SlackNotifier, TeamsNotifier, NotificationManager } from './notifiers';
 import { QualityGateEvaluator, formatGateReport } from './gates';
 import { QuarantineGenerator } from './quarantine';
 import { generateExecutivePdf, type PdfThemeName } from './generators/executive-pdf';
-import { formatDuration, stripAnsiCodes, sanitizeFilename, detectCIInfo, isFlakyTest } from './utils';
+import { formatDuration, stripAnsiCodes, sanitizeFilename, detectCIInfo, isFlakyTest, isUnexpectedFailure } from './utils';
 import { buildPlaywrightStyleAiPrompt } from './ai/prompt-builder';
 import type { CIInfo } from './types';
 import { LiveWriter, generateLiveReportPage } from './live';
@@ -492,7 +492,7 @@ class SmartReporter implements Reporter {
       // AI Suite Health Summary (opt-out with enableAISuiteHealth: false)
       if (options.enableAISuiteHealth !== false && this.aiAnalyzer.isAvailable()) {
         const passed = this.results.filter(r => r.status === 'passed' || r.outcome === 'expected' || r.outcome === 'flaky').length;
-        const failed = this.results.filter(r => r.outcome === 'unexpected' && (r.status === 'failed' || r.status === 'timedOut')).length;
+        const failed = this.results.filter(isUnexpectedFailure).length;
         const skipped = this.results.filter(r => r.status === 'skipped').length;
         const flakyCount = this.results.filter(r => isFlakyTest(r)).length;
         const slowCount = this.results.filter(r => r.performanceTrend?.startsWith('↑')).length;
@@ -525,10 +525,7 @@ class SmartReporter implements Reporter {
           r.outcome === 'expected' ||  // Expected failures count as "passed" (they behaved as expected)
           r.outcome === 'flaky'        // Flaky tests passed on retry
         ).length;
-        const failed = this.results.filter(r =>
-          r.outcome === 'unexpected' && // Only count truly unexpected failures
-          (r.status === 'failed' || r.status === 'timedOut')
-        ).length;
+        const failed = this.results.filter(isUnexpectedFailure).length;
         const skipped = this.results.filter(r => r.status === 'skipped').length;
         // Flaky: tests that passed on retry (outcome === 'flaky')
         const flaky = this.results.filter(r => r.outcome === 'flaky').length;
@@ -774,10 +771,7 @@ class SmartReporter implements Reporter {
     this.historyCollector.updateHistory(this.results);
 
     // Send webhook notifications if enabled - use outcome-based counting
-    const failed = this.results.filter(r =>
-      r.outcome === 'unexpected' &&
-      (r.status === 'failed' || r.status === 'timedOut')
-    ).length;
+    const failed = this.results.filter(isUnexpectedFailure).length;
 
     // Advanced notification manager takes precedence
     if (this.notificationManager) {
@@ -812,12 +806,16 @@ class SmartReporter implements Reporter {
   // ============================================================================
 
   /**
-   * Create a unique test ID from test file, title, and project name
-   * Issue #26: Include project name for parameterized projects
+   * Use Playwright's unique test ID, which includes the full title path,
+   * project, and repeat-each index. This prevents tests with duplicate titles
+   * from overwriting one another in resultsMap.
    * @param test - Playwright TestCase
-   * @returns Test ID string (e.g., "[Chrome] src/tests/login.spec.ts::Login Test")
+   * @returns Test ID string
    */
   private getTestId(test: TestCase): string {
+    if (test.id) return test.id;
+
+    // Fallback for lightweight/legacy TestCase implementations without id.
     const file = path.relative(this.outputDir, test.location.file)
       .replace(/\\/g, '/')       // Normalize to forward slashes
       .replace(/^\.\//, '');     // Strip leading ./

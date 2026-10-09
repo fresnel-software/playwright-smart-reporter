@@ -607,6 +607,8 @@ npm test
 npm run test:demo
 ```
 
+For branch setup, local report viewing, and downloading a report generated from GitHub Actions, see the [Local Development and GitHub Actions Report Workflow](docs/local-development-and-ci-report.md) guide.
+
 ## Contributors
 
 - [Gary Parker](https://github.com/qa-gary-parker) — Creator and maintainer

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { FailureClusterer } from './failure-clusterer';
 import type { TestResultData, FailureCluster } from '../types';
+import { isUnexpectedFailure } from '../utils/test-status';
 
 function createTestResult(overrides: Partial<TestResultData> = {}): TestResultData {
-  return {
+  const result: TestResultData = {
     testId: 'test-1',
     title: 'Test 1',
     file: 'test.spec.ts',
@@ -14,6 +15,14 @@ function createTestResult(overrides: Partial<TestResultData> = {}): TestResultDa
     history: [],
     ...overrides,
   };
+  // Status-only failure fixtures represent unexpected failures by default.
+  if (
+    result.outcome === undefined &&
+    isUnexpectedFailure({ status: result.status, outcome: 'unexpected' })
+  ) {
+    result.outcome = 'unexpected';
+  }
+  return result;
 }
 
 describe('FailureClusterer', () => {
@@ -72,6 +81,27 @@ describe('FailureClusterer', () => {
       const clusters = clusterer.clusterFailures(results);
 
       expect(clusters.length).toBe(1);
+    });
+
+    it('clusters exactly the unexpected failures counted by the report', () => {
+      const results = [
+        createTestResult({ testId: 'unexpected-failure', status: 'failed', outcome: 'unexpected' }),
+        createTestResult({ testId: 'unexpected-timeout', status: 'timedOut', outcome: 'unexpected' }),
+        createTestResult({ testId: 'expected-failure', status: 'failed', outcome: 'expected' }),
+        { ...createTestResult({ testId: 'missing-outcome', status: 'failed' }), outcome: undefined },
+        createTestResult({ testId: 'passed', status: 'passed', outcome: 'unexpected' }),
+      ];
+
+      const clusters = clusterer.clusterFailures(results);
+      const reportFailureCount = results.filter(test =>
+        test.outcome === 'unexpected' && (test.status === 'failed' || test.status === 'timedOut')
+      ).length;
+
+      expect(clusters.reduce((sum, cluster) => sum + cluster.count, 0)).toBe(reportFailureCount);
+      expect(clusters.flatMap(cluster => cluster.tests).map(test => test.testId).sort()).toEqual([
+        'unexpected-failure',
+        'unexpected-timeout',
+      ].sort());
     });
 
     it('handles unknown errors', () => {

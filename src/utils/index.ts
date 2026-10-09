@@ -7,3 +7,4 @@ export * from './sanitizers';
 export * from './markdown-lite';
 export * from './ci-detector';
 export * from './flakiness';
+export * from './test-status';
