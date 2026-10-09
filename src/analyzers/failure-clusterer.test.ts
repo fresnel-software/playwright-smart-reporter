@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FailureClusterer } from './failure-clusterer';
 import type { TestResultData, FailureCluster } from '../types';
+import { isUnexpectedFailure } from '../utils/test-status';
 
 function createTestResult(overrides: Partial<TestResultData> = {}): TestResultData {
   const result: TestResultData = {
@@ -14,9 +15,10 @@ function createTestResult(overrides: Partial<TestResultData> = {}): TestResultDa
     history: [],
     ...overrides,
   };
+  // Status-only failure fixtures represent unexpected failures by default.
   if (
     result.outcome === undefined &&
-    (result.status === 'failed' || result.status === 'timedOut')
+    isUnexpectedFailure({ status: result.status, outcome: 'unexpected' })
   ) {
     result.outcome = 'unexpected';
   }
