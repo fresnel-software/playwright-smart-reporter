@@ -107,6 +107,26 @@ describe('html-generator', () => {
       expect(html).toContain("item.classList.toggle('filter-hidden', !show)");
       expect(html).toContain("const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'))");
       expect(html).toContain("'Showing ' + visibleItems.length + ' of ' + filteredItems.length + ' tests'");
+      expect(html).toContain('const visibleItems = new Set(filteredItems.slice(0, visibleCount))');
+      expect(html).toContain('visibleCount = Math.min(PAGE_SIZE, filteredItems.length)');
+      expect(html).toContain('visibleCount = Math.min(visibleCount + PAGE_SIZE, filteredItems.length)');
+      expect(html).toContain('window.refreshTestListPagination(true);\n\n      // Check for empty state');
+      expect(html).toContain('loadMoreBtn.style.display = visibleCount >= filteredItems.length ? \'none\' : \'block\'');
+    });
+
+    it('renders a dynamic test count even when the report has fewer than one page', () => {
+      const { html } = generateHtml({
+        results: [createMinimalTestResult({ testId: 'small-report-test' })],
+        history: createTestHistory(),
+        startTime: Date.now(),
+        options: {},
+      });
+
+      expect(html).toContain("let visibleCount = Math.min(PAGE_SIZE, allItems.length)");
+      expect(html).toContain("countDiv.textContent = 'Showing ' + visibleCount + ' of ' + allItems.length + ' tests'");
+      expect(html).toContain('const observer = new MutationObserver(updateTestCount)');
+      expect(html).toContain('observer.observe(listContainer, { childList: false, subtree: true, attributes: true, attributeFilter: [\'class\', \'style\'] })');
+      expect(html).toContain('if (allItems.length <= PAGE_SIZE) return');
     });
 
     it('renders every failure cluster and every test in each cluster', () => {
@@ -145,6 +165,8 @@ describe('html-generator', () => {
         .map(match => Number(match[1]))).toEqual([8, 6, 4, 3, 2, 1]);
       expect([...html.matchAll(/<div class="cluster-type">Failure Type (\d+)<\/div>/g)]
         .map(match => Number(match[1]))).toEqual([6, 4, 2, 5, 3, 1]);
+      expect(html).toContain('data-testids="[&quot;cluster-1-test-1&quot;]" onclick="filterTestsByCluster(this)"');
+      expect(html).toContain('activeClusterTestIds.has(item.dataset.testid)');
       expect(html).toContain('aria-label="24 failed tests - click to filter"');
       expect(html).toContain('Failure Type 6');
       expect(html).toContain('Cluster 6 Test 8');
