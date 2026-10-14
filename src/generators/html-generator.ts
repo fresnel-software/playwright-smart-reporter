@@ -281,7 +281,7 @@ function generateOverviewContent(
           const errorPreview = firstError.split('\n')[0].slice(0, 100) + (firstError.length > 100 ? '...' : '');
           const affectedFiles = [...new Set(cluster.tests.map(t => t.file))];
           return `
-          <div class="cluster-card" onclick="filterTests('failed'); switchView('tests');">
+          <div class="cluster-card" data-testids="${escapeHtml(JSON.stringify(cluster.tests.map(test => test.testId)))}" onclick="filterTestsByCluster(this)">
             <div class="cluster-header">
               <div class="cluster-icon">${icon('alert-triangle')}</div>
               <div class="cluster-type">${escapeHtml(cluster.errorType)}</div>
@@ -8601,6 +8601,8 @@ function generateScripts(
       document.querySelectorAll('.file-tree-item').forEach(item => {
         item.classList.toggle('active', item.dataset.file === file);
       });
+
+      window.refreshTestListPagination(true);
     }
 
     function filterByStatus(status) {
@@ -8693,6 +8695,8 @@ function generateScripts(
         group.style.display = hasVisible ? 'block' : 'none';
       });
 
+      window.refreshTestListPagination(true);
+
       // Check for empty state
       checkEmptyState();
     }
@@ -8706,6 +8710,7 @@ function generateScripts(
       suite: new Set(),
       tag: new Set()
     };
+    let activeClusterTestIds = null;
 
     function toggleFilter(chip) {
       const filter = chip.dataset.filter;
@@ -8726,6 +8731,7 @@ function generateScripts(
     }
 
     function clearAllFilters() {
+      activeClusterTestIds = null;
       activeFilters.attention.clear();
       activeFilters.status.clear();
       activeFilters.health.clear();
@@ -8739,6 +8745,20 @@ function generateScripts(
       applyFilters();
     }
 
+    function filterTestsByCluster(clusterCard) {
+      let testIds;
+      try {
+        testIds = JSON.parse(clusterCard.dataset.testids);
+      } catch {
+        return;
+      }
+
+      switchView('tests');
+      clearAllFilters();
+      activeClusterTestIds = new Set(testIds);
+      applyFilters();
+    }
+
     function applyFilters() {
       const hasAttentionFilters = activeFilters.attention.size > 0;
       const hasStatusFilters = activeFilters.status.size > 0;
@@ -8746,7 +8766,7 @@ function generateScripts(
       const hasGradeFilters = activeFilters.grade.size > 0;
       const hasSuiteFilters = activeFilters.suite.size > 0;
       const hasTagFilters = activeFilters.tag.size > 0;
-      const hasAnyFilter = hasAttentionFilters || hasStatusFilters || hasHealthFilters || hasGradeFilters || hasSuiteFilters || hasTagFilters;
+      const hasAnyFilter = hasAttentionFilters || hasStatusFilters || hasHealthFilters || hasGradeFilters || hasSuiteFilters || hasTagFilters || activeClusterTestIds !== null;
 
       // Helper to check if element matches suite filter
       function matchesSuiteFilter(el) {
@@ -8783,6 +8803,7 @@ function generateScripts(
         const isRegression = item.dataset.regression === 'true';
         const isFixed = item.dataset.fixed === 'true';
         const grade = item.dataset.grade;
+        const matchesCluster = activeClusterTestIds === null || activeClusterTestIds.has(item.dataset.testid);
 
         // If no filters active, show all
         if (!hasAnyFilter) {
@@ -8837,7 +8858,7 @@ function generateScripts(
         const matchesTag = matchesTagFilter(item);
 
         // AND between groups
-        const show = matchesAttention && matchesStatus && matchesHealth && matchesGrade && matchesSuite && matchesTag;
+        const show = matchesCluster && matchesAttention && matchesStatus && matchesHealth && matchesGrade && matchesSuite && matchesTag;
         item.classList.toggle('filter-hidden', !show);
         item.style.display = show ? 'flex' : 'none';
       });
@@ -8853,6 +8874,7 @@ function generateScripts(
         const isRegression = card.dataset.regression === 'true';
         const isFixed = card.dataset.fixed === 'true';
         const grade = card.dataset.grade;
+        const matchesCluster = activeClusterTestIds === null || activeClusterTestIds.has(card.dataset.testid);
 
         if (!hasAnyFilter) {
           card.style.display = 'block';
@@ -8899,7 +8921,7 @@ function generateScripts(
         const matchesSuite = matchesSuiteFilter(card);
         const matchesTag = matchesTagFilter(card);
 
-        const show = matchesAttention && matchesStatus && matchesHealth && matchesGrade && matchesSuite && matchesTag;
+        const show = matchesCluster && matchesAttention && matchesStatus && matchesHealth && matchesGrade && matchesSuite && matchesTag;
         card.style.display = show ? 'block' : 'none';
       });
 
@@ -8915,6 +8937,8 @@ function generateScripts(
       document.querySelectorAll('.file-tree-item').forEach(item => {
         item.classList.remove('active');
       });
+
+      window.refreshTestListPagination(true);
 
       // Check for empty state
       checkEmptyState();
@@ -9676,45 +9700,62 @@ ${includeComparison ? `    // Comparison functions\n${generateComparisonScript()
       if (!listContainer) return;
 
       const allItems = Array.from(listContainer.children);
-      if (allItems.length <= PAGE_SIZE) return;
-
-      let visibleCount = PAGE_SIZE;
-
-      // Initially hide items beyond page size
-      allItems.forEach((item, i) => {
-        if (i >= PAGE_SIZE) item.style.display = 'none';
-      });
+      let visibleCount = Math.min(PAGE_SIZE, allItems.length);
 
       // Add count indicator
       const countDiv = document.createElement('div');
       countDiv.className = 'test-list-item-count';
-      countDiv.textContent = 'Showing ' + PAGE_SIZE + ' of ' + allItems.length + ' tests';
+      countDiv.textContent = 'Showing ' + visibleCount + ' of ' + allItems.length + ' tests';
       listContainer.parentNode.insertBefore(countDiv, listContainer);
 
+      function updateTestCount() {
+        const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
+        const visibleItems = filteredItems.filter(item => item.style.display !== 'none');
+        countDiv.textContent = 'Showing ' + visibleItems.length + ' of ' + filteredItems.length + ' tests';
+        if (loadMoreBtn) {
+          loadMoreBtn.style.display = visibleCount >= filteredItems.length ? 'none' : 'block';
+        }
+      }
+
+      let loadMoreBtn = null;
+
+      function refreshTestListPagination(resetPage) {
+        const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
+        if (resetPage) {
+          visibleCount = Math.min(PAGE_SIZE, filteredItems.length);
+        } else {
+          visibleCount = Math.min(visibleCount, filteredItems.length);
+        }
+
+        const visibleItems = new Set(filteredItems.slice(0, visibleCount));
+        allItems.forEach(item => {
+          const shouldShow = visibleItems.has(item);
+          item.style.display = shouldShow ? 'flex' : 'none';
+        });
+        updateTestCount();
+      }
+
+      window.refreshTestListPagination = refreshTestListPagination;
+
+      const observer = new MutationObserver(updateTestCount);
+      observer.observe(listContainer, { childList: false, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+
+      refreshTestListPagination(true);
+
+      if (allItems.length <= PAGE_SIZE) return;
+
       // Add load more button
-      const loadMoreBtn = document.createElement('button');
+      loadMoreBtn = document.createElement('button');
       loadMoreBtn.textContent = 'Load more tests...';
       loadMoreBtn.className = 'summary-card-btn';
       loadMoreBtn.style.cssText = 'margin: 12px auto; display: block;';
       loadMoreBtn.onclick = function() {
-        const newCount = Math.min(visibleCount + PAGE_SIZE, allItems.length);
-        for (let i = visibleCount; i < newCount; i++) {
-          allItems[i].style.display = allItems[i].classList.contains('filter-hidden') ? 'none' : '';
-        }
-        visibleCount = newCount;
-        if (visibleCount >= allItems.length) {
-          loadMoreBtn.style.display = 'none';
-        }
+        const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
+        visibleCount = Math.min(visibleCount + PAGE_SIZE, filteredItems.length);
+        refreshTestListPagination(false);
       };
       listContainer.parentNode.appendChild(loadMoreBtn);
-
-      // Listen for filter changes to reset pagination
-      const observer = new MutationObserver(() => {
-        const filteredItems = allItems.filter(item => !item.classList.contains('filter-hidden'));
-        const visibleItems = filteredItems.filter(item => item.style.display !== 'none');
-        countDiv.textContent = 'Showing ' + visibleItems.length + ' of ' + filteredItems.length + ' tests';
-      });
-      observer.observe(listContainer, { childList: false, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+      updateTestCount();
     })();
 
     /* ============================================
