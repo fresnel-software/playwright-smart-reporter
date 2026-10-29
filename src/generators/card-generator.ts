@@ -134,6 +134,7 @@ export function generateTestCard(test: TestResultData, showTraceSection: boolean
 
   return `
     <div id="card-${cardId}" class="test-card"
+         data-testid="${escapeHtml(test.testId)}"
          data-status="${test.status}"
          data-flaky="${isFlaky}"
          data-unstable="${isUnstable}"
