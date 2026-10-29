@@ -167,6 +167,8 @@ describe('html-generator', () => {
         .map(match => Number(match[1]))).toEqual([6, 4, 2, 5, 3, 1]);
       expect(html).toContain('data-testids="[&quot;cluster-1-test-1&quot;]" onclick="filterTestsByCluster(this)"');
       expect(html).toContain('activeClusterTestIds.has(item.dataset.testid)');
+      expect(html).toMatch(/id="card-cluster_1_test_1" class="test-card"\s+data-testid="cluster-1-test-1"/);
+      expect(html).toContain('activeClusterTestIds.has(card.dataset.testid)');
       expect(html).toContain('aria-label="24 failed tests - click to filter"');
       expect(html).toContain('Failure Type 6');
       expect(html).toContain('Cluster 6 Test 8');
